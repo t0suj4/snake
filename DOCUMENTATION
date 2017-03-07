@@ -1,0 +1,107 @@
+Introduction
+------------
+
+Snake is a game where the player must eat apples in order to gain
+score. This version of the game is enhanced by adding stones and
+rotting apples. Thus the player's inaction can cause them create more
+obstacles on the board.
+
+Hacking the code
+----------------
+
+TLDR: `grep -i papple *` will tell a lot what and where to hack.
+
+The code contains self-descriptive function names so I won't be
+covering what they do. Instead, I will try to briefly explain what
+they need as adding comments directly into the code comments would
+make it hard to read, tools like doxygen doesn't help this.
+
+The game is divided into four more or less decoupled groups:
+
+* The game: game.c
+It manages the game state and initializes objects on the board. If you
+want to add new objects, they should be added in init_board(),
+repopulate_board() prepares the objects on the board before start of
+the game, if your objects must not survive restart, put the cleanup
+code there. It also contains GameObject manipulation code.
+
+WARNING: The code assumes that every GameObject has associated
+graphics. If there is supposed to be an object without graphics
+representation, simply create Graphics object through graphics_new()
+with dummy values and leave its ->points an empty list.
+
+* Game logic: gamelogic.c
+Drives the gameplay, it is independent enough it could survive
+transition into 3D space. Add the logic for your new objects here and
+call it from gamelogic_step function, note that apples won't spawn
+over any objects on the board as they spawn only in free space. If it
+is supposed to interact with the snake, snake_check_collisions is the
+right function.
+
+* Rendering: draw.c snake.c
+Functions in draw.c project game state into corresponding windows,
+using ncurses, please refer to ncurses(3X) for details.
+Function fix_win() in snake.c deal only with proper handling of
+terminal window resize.
+snake.c defines all the constants that use graphics subsystem, it is
+therefore add the definitions there. Function init_graphics()
+initializes color pairs for all objects in the game.
+
+* Threads: snake.c
+Manipulating and initializing threads is localized into snake.c, note
+that passing arguments to threads is done via list, if there is need
+to add more objects, proceed carefully and update every _thread
+function to match the new code. Threads use C11 API wrapper around
+pthreads.
+
+other files:
+list.c: contains implementation of linked list used in the game.
+gameboard.c: Implements game board as passive bag of objects.
+point.c: Implements Point structure for point manipulation.
+utils.c: Utility code.
+listtest.c: For list library testing (using printf), can be useful to
+	    look for examples.
+
+
+Code style
+----------
+Coding style is possible to observe from reading the code, it is
+generally trying to stay near Linux kernel coding standards.
+
+USE OF LISTS:
+Whenever you see `ThingsList` the list will be definitely used in
+list_foreach() or list_find() functions operating over type `Thing`.
+However, when the data type is only plain `List` it can contain ANY
+data of ANY type, so be careful when using them. `ThingsList` is not
+safe either as there are no static compiler checking, so be extra
+careful manipulating with their types.
+
+
+Room for improvement
+--------------------
+
+* Bugfixes:
+-Smoother input-
+Move input handling code together with game step loop, currently the
+input handler is on the mercy of system task scheduler, delivering
+some keypresses late.
+
+-Stone generation-
+Currently the stones are generated randomly on the board without
+taking into account other object position, so it is possible to kill
+the player instantly upon starting new game.
+
+-Keybinding info window-
+Fix it so it centers perfectly.
+
+
+* Gameplay enhancement:
+-Leaves-
+You can add leaves to the game for nice decorated background and as a
+safehaven for the player: Apples cannot spawn over other objects,
+therefore it won't produce dangerous rotten apples.
+This would require to create new object for the board in
+game.c:board_init() and initializing them in game.c:board_populate(),
+creating three new constants LEAF_CHAR, LEAF_PAIR and LEAF_COLOR,
+initialize it in snake.c:init_graphics(). Since leaves wouldn't do
+anything, there's no need to add them into game logic.
